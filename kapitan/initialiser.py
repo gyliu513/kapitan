@@ -1,46 +1,55 @@
 #!/usr/bin/env python3
-#
+
 # Copyright 2019 The Kapitan Authors
+# SPDX-FileCopyrightText: 2020 The Kapitan Authors <kapitan-admins@googlegroups.com>
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
 "initialiser module"
 
+import glob
 import logging
 import os
-import sys
-import shutil
-from distutils.dir_util import copy_tree
+
+from copier import run_copy
+
+from kapitan.errors import KapitanError
+from kapitan.version import VERSION as kapitan_version
 
 logger = logging.getLogger(__name__)
 
-def initialise_skeleton(directory):
-    """ Initialises a directory with a recommended skeleton structure
+
+def initialise_skeleton(args):
+    """Initialises a directory with a recommended skeleton structure using cruft
     Args:
-        directory (string): path which to initialise, directory is assumed to exist
+        args.template_git_url (string): path or url that contains the cruft repository template
+        args.checkout_ref (string): branch, tag or commit to checkout from the template repository
+        args.directory (string): directory to initialise the skeleton in (default is current directory)
     """
 
-    current_pwd = os.path.dirname(__file__)
-    templates_directory = os.path.join(current_pwd, 'inputs', 'templates')
+    template_git_url = args.template_git_url
+    checkout_ref = args.checkout_ref
+    directory = os.path.abspath(args.directory)
 
-    copy_tree(templates_directory, directory)
+    if set(glob.iglob(os.path.join(directory, "./*"))):
+        raise KapitanError(f"Directory {directory} is not empty. Please initialise in an empty directory.")
 
-    logger.info("Populated {} with:".format(directory))
-    for dirName, subdirList, fileList in os.walk(directory):
-        logger.info('{}'.format(dirName))
-        for fname in fileList:
-            logger.info('\t {}'.format(fname))
-        # Remove the first entry in the list of sub-directories
-        # if there are any sub-directories present
-        if len(subdirList) > 0:
-            del subdirList[0]
+    logger.info(f"Initialising kapitan from {template_git_url}@{checkout_ref} in {directory}")
+    user_defaults = {
+        "kapitan_version": kapitan_version,
+    }
+    run_copy(
+        template_git_url,
+        vcs_ref=args.checkout_ref,
+        unsafe=True,
+        dst_path=directory,
+        quiet=True,
+        user_defaults=user_defaults,
+        skip_answered=False,
+    )
+
+    if directory == os.path.abspath(os.path.curdir):
+        logger.info(f"Successfully initialised: run `kapitan --version`")
+    else:
+        logger.info(f"Successfully initialised kapitan in {directory}")
+        logger.info("Please go to the directory and run `kapitan --version`")

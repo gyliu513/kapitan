@@ -1,48 +1,67 @@
 #!/usr/bin/env python3
-#
-# Copyright 2019 The Kapitan Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-"init tests"
+# Copyright 2019 The Kapitan Authors
+# SPDX-FileCopyrightText: 2020 The Kapitan Authors <kapitan-admins@googlegroups.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+"initialiser module tests"
 
 import logging
-import unittest
-import tempfile
 import os
+import shutil
+import tempfile
+import unittest
+from unittest.mock import patch
 
+from kapitan.errors import KapitanError
 from kapitan.initialiser import initialise_skeleton
 
-logging.basicConfig(level=logging.CRITICAL, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
-class InitTest(unittest.TestCase):
-    def test_init(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            initialise_skeleton(directory=tmp_dir)
+class InitialiserTest(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.template_url = "https://github.com/kapicorp/kapitan-reference"
+        self.checkout_ref = "master"
 
-            template_dir = os.path.join(
-                os.getcwd(), 'kapitan', 'inputs', 'templates')
+    def test_initialise_skeleton_success(self):
+        """
+        Verify that initialise_skeleton succeeds when target directory is empty
+        """
+        initialise_skeleton(self._create_args(self.tmpdir))
 
-            diff_files = []
-            
-            for root, dirs, files in os.walk(tmp_dir):
-                diff_files += files
-            
-            for root, dirs, files in os.walk(template_dir):
-                for f in files:
-                    if f in diff_files:
-                        diff_files.remove(f)
+        # Assert that the directory is no longer empty (indicating successful initialisation)
+        self.assertTrue(len(os.listdir(self.tmpdir)) > 0, "Target directory is still empty")
 
-            self.assertEqual(len(diff_files), 0)
+    @patch("kapitan.initialiser.run_copy")
+    def test_initialise_skeleton_non_empty_dir(self, mocked_run_copy):
+        """
+        Verify that initialise_skeleton logs an error when target directory is not empty
+        """
+        # Create a dummy file in the temporary directory, simulating a non-empty directory
+        dummy_file = os.path.join(self.tmpdir, "dummy.txt")
+        with open(dummy_file, "w") as f:
+            f.write("This is a dummy file")
+
+        with self.assertRaises(KapitanError):
+            initialise_skeleton(self._create_args(self.tmpdir))
+
+            mocked_run_copy.assert_not_called()  # Make sure run_copy was not called
+
+    def tearDown(self):
+        # Clean up the temporary directory after each test
+        shutil.rmtree(self.tmpdir)
+
+    def _create_args(self, target_dir):
+        """Helper function to create Namespace object for testing"""
+        return type(
+            "args",
+            (object,),
+            {
+                "template_git_url": self.template_url,
+                "checkout_ref": self.checkout_ref,
+                "directory": target_dir,
+            },
+        )

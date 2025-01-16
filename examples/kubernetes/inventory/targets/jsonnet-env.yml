@@ -1,0 +1,13 @@
+classes:
+  - jsonnet-env
+
+parameters:
+  target_name: jsonnet-env
+  kapitan:
+    compile:
+      - output_path: jsonnet-env
+        input_type: jsonnet
+        input_params: {}
+        input_paths:
+          - components/jsonnet-env/env.jsonnet
+        output_type: yml

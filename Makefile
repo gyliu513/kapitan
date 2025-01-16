@@ -1,27 +1,46 @@
 all: clean package
 
+.PHONY: pre-requisites
+pre-requisites:
+	@echo ----- Installing pre-requisites -----
+	poetry install --with dev --with docs --with test
+
+.PHONY: lint
+lint:
+	@echo ----- Running lint -----
+	poetry run flake8 kapitan
+	poetry run mypy kapitan
+	poetry run pylint kapitan
+
+.PHONY: install poetry with pipx
+install_poetry:
+	@echo ----- Installing poetry with pipx -----
+	which poetry || pipx install poetry
+
 .PHONY: test
-test:
+test: pre-requisites lint test_python test_docker test_coverage test_formatting
 	@echo ----- Running python tests -----
-	python3 -m unittest discover
+	poetry run pytest
+
+.PHONY: test_docker
+test_docker:
 	@echo ----- Testing build of docker image -----
 	docker build . --no-cache -t kapitan
 	@echo ----- Testing run of docker image -----
 	docker run -ti --rm kapitan --help
 	docker run -ti --rm kapitan lint
-	@echo ----- Testing build of docker ci image -----
-	cd ci
-	docker build . --no-cache -t kapitan-ci
-	@echo ----- Testing run of docker ci image -----
-	docker run -ti --rm kapitan-ci --help
-	docker run -ti --rm kapitan-ci lint
-	cd ..
 
 .PHONY: test_coverage
 test_coverage:
 	@echo ----- Testing code coverage -----
-	coverage run --source=kapitan --omit="*reclass*" -m unittest discover
-	coverage report --fail-under=60 -m
+	poetry run coverage run --source=kapitan -m pytest
+	poetry run coverage report --fail-under=65 -m
+
+.PHONY: test_formatting
+test_formatting:
+	@echo ----- Testing code formatting -----
+	poetry run black --check .
+	@echo
 
 .PHONY: release
 release:
@@ -37,11 +56,17 @@ package:
 
 .PHONY: clean
 clean:
-	rm -rf dist/ build/ kapitan.egg-info/
+	rm -rf dist/ build/ kapitan.egg-info/ bindist/
 
-.PHONY: codestyle
-codestyle:
-	which flake8 || echo "Install flake8 with pip3 install --user flake8"
-	# ignores line length and reclass related errors
-	flake8 --ignore E501 . --exclude=reclass
+.PHONY: format_codestyle
+format_codestyle:
+	poetry run black .
 	@echo
+
+.PHONY: local_serve_documentation
+local_serve_documentation:
+	poetry run mike serve
+
+.PHONY: mkdocs_gh_deploy
+mkdocs_gh_deploy:
+	poetry run mike deploy --push dev master

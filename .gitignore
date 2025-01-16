@@ -1,10 +1,35 @@
-*.pyc
-*.swp
-*.bak
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+.gitpod.yml
+
+# C extensions
+*.so
+*.h
+
+# Distribution / packaging
 build/
 dist/
+bindist/
 kapitan.egg-info/
+_site/
+site/
+
+# IDEs
+.vscode/
+
+# Other
+*.bak
+.DS_Store
+*.swp
 tags
+
+# Versioning
 .python-version
 .kapitan
+.tool-versions
+
+# Unit test / coverage reports
 .coverage

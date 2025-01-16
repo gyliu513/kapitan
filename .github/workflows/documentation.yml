@@ -1,0 +1,52 @@
+---
+name: Build and deploy kapitan.dev from docs
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/documentation.yml'
+      - 'mkdocs.yml'
+      - 'CNAME'
+  push:
+    branches:
+      - master
+    paths:
+      - 'docs/**'
+      - '.github/workflows/documentation.yml'
+      - 'mkdocs.yml'
+      - 'CNAME'
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kapitan recursively
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          cache: 'poetry'
+      - name: Install libraries dependencies
+        run: |
+          poetry install --only docs --no-root
+          poetry run mike --version
+          poetry run mkdocs --version
+
+      - run: poetry run mkdocs build
+      - name: Deploy docs
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_COMMITTER_NAME: mike-mkdocs-bot
+          GIT_COMMITTER_EMAIL: admins@kapicorp
+        run: poetry run mike deploy --push dev master
